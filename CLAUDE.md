@@ -1,7 +1,16 @@
 # cadence_api
 
-Backend REST do Cadence — Bun + ElysiaJS + Drizzle (SQLite). Contexto completo do projeto
-(produto, contratos, regras) em `../` — comece por `../CLAUDE.md`.
+Backend REST do Cadence — Bun + ElysiaJS + Drizzle (SQLite). Contexto compartilhado do
+projeto em `../` (comece por `../CLAUDE.md`).
+
+## Arquivos de IA deste repo
+
+| Doc | Quando |
+|---|---|
+| `product.md` | escopo e regras de negócio da API |
+| `context.md` | arquitetura, modelo de dados, decisões |
+| `agents.md` | regras de trabalho neste repo — **sempre** |
+| `skills.md` | receitas: endpoint novo, tabela nova, debug |
 
 ## Comandos
 

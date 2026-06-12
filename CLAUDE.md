@@ -12,6 +12,13 @@ projeto em `../` (comece por `../CLAUDE.md`).
 | `agents.md` | regras de trabalho neste repo — **sempre** |
 | `skills.md` | receitas: endpoint novo, tabela nova, debug |
 
+## Skills invocáveis (`.claude/skills/`)
+
+| Skill | Quando |
+|---|---|
+| `new-endpoint` | rota nova ou mudança de contrato |
+| `db-change` | mudança de schema/migration (e recuperação quando der ruim) |
+
 ## Comandos
 
 ```bash

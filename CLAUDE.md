@@ -18,6 +18,7 @@ projeto em `../` (comece por `../CLAUDE.md`).
 |---|---|
 | `new-endpoint` | rota nova ou mudança de contrato |
 | `db-change` | mudança de schema/migration (e recuperação quando der ruim) |
+| `security` | qualquer rota/auth/query — autorização, validação, segredos |
 
 ## Comandos
 

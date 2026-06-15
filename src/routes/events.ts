@@ -56,7 +56,7 @@ export const eventRoutes = new Elysia({ prefix: "/events" })
     "/",
     async ({ userId, body, status }) => {
       if (!validEventTime(body)) return status(400, invalidRequest);
-      const [event] = await db.insert(events).values({ ...body, userId }).returning();
+      const [event] = await db.insert(events).values({ userId, title: body.title, notes: body.notes, startsAt: body.startsAt, endsAt: body.endsAt, color: body.color }).returning();
       return event;
     },
     {
@@ -66,9 +66,10 @@ export const eventRoutes = new Elysia({ prefix: "/events" })
   .patch(
     "/:id",
     async ({ userId, params, body, status }) => {
+      const id = Number(params.id);
       if (!validEventTime(body)) return status(400, invalidRequest);
-      if (!(await ownEvent(userId, params.id))) return status(404, { error: "Event not found" });
-      const [event] = await db.update(events).set(body).where(eq(events.id, params.id)).returning();
+      if (!(await ownEvent(userId, id))) return status(404, { error: "Event not found" });
+      const [event] = await db.update(events).set(body as Partial<typeof events.$inferInsert>).where(eq(events.id, id)).returning();
       return event;
     },
     { params: t.Object({ id: t.Integer() }), body: t.Partial(t.Object(eventBody)) },
@@ -76,8 +77,9 @@ export const eventRoutes = new Elysia({ prefix: "/events" })
   .delete(
     "/:id",
     async ({ userId, params, status }) => {
-      if (!(await ownEvent(userId, params.id))) return status(404, { error: "Event not found" });
-      await db.delete(events).where(eq(events.id, params.id));
+      const id = Number(params.id);
+      if (!(await ownEvent(userId, id))) return status(404, { error: "Event not found" });
+      await db.delete(events).where(eq(events.id, id));
       return { ok: true };
     },
     { params: t.Object({ id: t.Integer() }) },

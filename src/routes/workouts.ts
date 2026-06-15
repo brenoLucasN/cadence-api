@@ -45,7 +45,7 @@ const insertExercises = async (workoutId: number, items: (typeof exerciseBody.st
   if (items.length === 0) return;
   await db
     .insert(exercises)
-    .values(items.map((e, position) => ({ ...e, workoutId, position })))
+    .values(items.map((e, position) => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, restSec: e.restSec, workoutId, position })))
 };
 
 const validSessionTime = (body: { startedAt: string; finishedAt?: string | null }) => {
@@ -65,7 +65,7 @@ export const workoutRoutes = new Elysia()
       .post(
         "/",
         async ({ userId, body: { exercises: items, ...body } }) => {
-          const [workout] = await db.insert(workouts).values({ ...body, userId }).returning();
+          const [workout] = await db.insert(workouts).values({ userId, name: body.name, color: body.color, notes: body.notes }).returning();
           await insertExercises(workout.id, items);
           return (await withExercises([workout]))[0];
         },
@@ -74,14 +74,15 @@ export const workoutRoutes = new Elysia()
       .patch(
         "/:id",
         async ({ userId, params, body: { exercises: items, ...body }, status }) => {
-          const existing = await ownWorkout(userId, params.id);
+          const id = Number(params.id);
+          const existing = await ownWorkout(userId, id);
           if (!existing) return status(404, { error: "Workout not found" });
           const workout = Object.keys(body).length
-            ? (await db.update(workouts).set(body).where(eq(workouts.id, params.id)).returning())[0]
+            ? (await db.update(workouts).set(body as Partial<typeof workouts.$inferInsert>).where(eq(workouts.id, id)).returning())[0]
             : existing;
           if (items) {
-            await db.delete(exercises).where(eq(exercises.workoutId, params.id));
-            await insertExercises(params.id, items);
+            await db.delete(exercises).where(eq(exercises.workoutId, id));
+            await insertExercises(id, items);
           }
           return (await withExercises([workout]))[0];
         },
@@ -93,10 +94,11 @@ export const workoutRoutes = new Elysia()
       .delete(
         "/:id",
         async ({ userId, params, status }) => {
-          if (!(await ownWorkout(userId, params.id))) return status(404, { error: "Workout not found" });
-          await db.delete(sessions).where(eq(sessions.workoutId, params.id));
-          await db.delete(exercises).where(eq(exercises.workoutId, params.id));
-          await db.delete(workouts).where(eq(workouts.id, params.id));
+          const id = Number(params.id);
+          if (!(await ownWorkout(userId, id))) return status(404, { error: "Workout not found" });
+          await db.delete(sessions).where(eq(sessions.workoutId, id));
+          await db.delete(exercises).where(eq(exercises.workoutId, id));
+          await db.delete(workouts).where(eq(workouts.id, id));
           return { ok: true };
         },
         { params: t.Object({ id: t.Integer() }) },
@@ -104,11 +106,12 @@ export const workoutRoutes = new Elysia()
       .post(
         "/:id/sessions",
         async ({ userId, params, body, status }) => {
+          const id = Number(params.id);
           if (!validSessionTime(body)) return status(400, invalidRequest);
-          if (!(await ownWorkout(userId, params.id))) return status(404, { error: "Workout not found" });
+          if (!(await ownWorkout(userId, id))) return status(404, { error: "Workout not found" });
           const [session] = await db
             .insert(sessions)
-            .values({ ...body, workoutId: params.id, userId })
+            .values({ startedAt: body.startedAt, finishedAt: body.finishedAt, notes: body.notes, workoutId: id, userId })
             .returning();
           return session;
         },

@@ -73,7 +73,7 @@ export const habitRoutes = new Elysia({ prefix: "/habits" })
   .post(
     "/",
     async ({ userId, body }) => {
-      const [habit] = await db.insert(habits).values({ ...body, userId }).returning();
+      const [habit] = await db.insert(habits).values({ userId, name: body.name, icon: body.icon, color: body.color, days: body.days, goal: body.goal, reminder: body.reminder }).returning();
       return habit;
     },
     {
@@ -83,8 +83,9 @@ export const habitRoutes = new Elysia({ prefix: "/habits" })
   .patch(
     "/:id",
     async ({ userId, params, body, status }) => {
-      if (!(await ownHabit(userId, params.id))) return status(404, { error: "Habit not found" });
-      const [habit] = await db.update(habits).set(body).where(eq(habits.id, params.id)).returning();
+      const id = Number(params.id);
+      if (!(await ownHabit(userId, id))) return status(404, { error: "Habit not found" });
+      const [habit] = await db.update(habits).set(body as Partial<typeof habits.$inferInsert>).where(eq(habits.id, id)).returning();
       return habit;
     },
     {
@@ -95,9 +96,10 @@ export const habitRoutes = new Elysia({ prefix: "/habits" })
   .delete(
     "/:id",
     async ({ userId, params, status }) => {
-      if (!(await ownHabit(userId, params.id))) return status(404, { error: "Habit not found" });
-      await db.delete(checks).where(eq(checks.habitId, params.id));
-      await db.delete(habits).where(eq(habits.id, params.id));
+      const id = Number(params.id);
+      if (!(await ownHabit(userId, id))) return status(404, { error: "Habit not found" });
+      await db.delete(checks).where(eq(checks.habitId, id));
+      await db.delete(habits).where(eq(habits.id, id));
       return { ok: true };
     },
     { params: t.Object({ id: t.Integer() }) },
@@ -105,15 +107,16 @@ export const habitRoutes = new Elysia({ prefix: "/habits" })
   .put(
     "/:id/check",
     async ({ userId, params, body, status }) => {
+      const id = Number(params.id);
       if (!isValidDateOnly(body.date)) return status(400, invalidRequest);
-      if (!(await ownHabit(userId, params.id))) return status(404, { error: "Habit not found" });
+      if (!(await ownHabit(userId, id))) return status(404, { error: "Habit not found" });
       if (body.count === 0) {
-        await db.delete(checks).where(and(eq(checks.habitId, params.id), eq(checks.date, body.date)));
-        return { habitId: params.id, date: body.date, count: 0 };
+        await db.delete(checks).where(and(eq(checks.habitId, id), eq(checks.date, body.date)));
+        return { habitId: id, date: body.date, count: 0 };
       }
       const [check] = await db
         .insert(checks)
-        .values({ habitId: params.id, date: body.date, count: body.count })
+        .values({ habitId: id, date: body.date, count: body.count })
         .onConflictDoUpdate({
           target: [checks.habitId, checks.date],
           set: { count: body.count },

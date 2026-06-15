@@ -8,7 +8,7 @@
     "start": "bun src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun src/db/migrate.ts",
-    "build": "bun db:migrate && bun build src/index.ts --outfile=api/index.js --target=node --bundle",
+    "build": "bun db:migrate",
     "test": "bun test"
   },
   "dependencies": {

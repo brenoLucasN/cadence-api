@@ -3,72 +3,87 @@ import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "../db";
 import { workouts, exercises, sessions } from "../db/schema";
 import { authPlugin } from "../plugins/auth";
+import {
+  boundedText,
+  hexColor,
+  invalidRequest,
+  isoUtc,
+  isValidIsoUtc,
+  optionalNullableText,
+} from "../validation";
 
 const exerciseBody = t.Object({
-  name: t.String({ minLength: 1 }),
-  sets: t.Optional(t.Integer({ minimum: 1 })),
-  reps: t.Optional(t.Integer({ minimum: 1 })),
-  weight: t.Optional(t.Nullable(t.Integer({ minimum: 0 }))),
-  restSec: t.Optional(t.Integer({ minimum: 0 })),
+  name: boundedText(80),
+  sets: t.Optional(t.Integer({ minimum: 1, maximum: 99 })),
+  reps: t.Optional(t.Integer({ minimum: 1, maximum: 999 })),
+  weight: t.Optional(t.Nullable(t.Integer({ minimum: 0, maximum: 9999 }))),
+  restSec: t.Optional(t.Integer({ minimum: 0, maximum: 3600 })),
 });
 
 const workoutBody = {
-  name: t.String({ minLength: 1 }),
-  color: t.Optional(t.String()),
-  notes: t.Optional(t.Nullable(t.String())),
+  name: boundedText(80),
+  color: t.Optional(hexColor),
+  notes: optionalNullableText(2000),
 };
 
-const ownWorkout = (userId: number, id: number) =>
-  db.select().from(workouts).where(and(eq(workouts.id, id), eq(workouts.userId, userId))).get();
+const ownWorkout = async (userId: number, id: number) => {
+  const [workout] = await db.select().from(workouts).where(and(eq(workouts.id, id), eq(workouts.userId, userId)));
+  return workout;
+};
 
-const withExercises = (list: (typeof workouts.$inferSelect)[]) => {
+const withExercises = async (list: (typeof workouts.$inferSelect)[]) => {
   if (list.length === 0) return [];
-  const all = db
+  const all = await db
     .select()
     .from(exercises)
     .where(inArray(exercises.workoutId, list.map((w) => w.id)))
-    .orderBy(exercises.position)
-    .all();
+    .orderBy(exercises.position);
   return list.map((w) => ({ ...w, exercises: all.filter((e) => e.workoutId === w.id) }));
 };
 
-const insertExercises = (workoutId: number, items: (typeof exerciseBody.static)[]) => {
+const insertExercises = async (workoutId: number, items: (typeof exerciseBody.static)[]) => {
   if (items.length === 0) return;
-  db.insert(exercises)
+  await db
+    .insert(exercises)
     .values(items.map((e, position) => ({ ...e, workoutId, position })))
-    .run();
+};
+
+const validSessionTime = (body: { startedAt: string; finishedAt?: string | null }) => {
+  if (!isValidIsoUtc(body.startedAt)) return false;
+  if (body.finishedAt !== undefined && body.finishedAt !== null && !isValidIsoUtc(body.finishedAt)) return false;
+  if (body.finishedAt && body.startedAt >= body.finishedAt) return false;
+  return true;
 };
 
 export const workoutRoutes = new Elysia()
   .use(authPlugin)
   .group("/workouts", (app) =>
     app
-      .get("/", ({ userId }) =>
-        withExercises(
-          db.select().from(workouts).where(eq(workouts.userId, userId)).orderBy(workouts.position).all(),
-        ),
+      .get("/", async ({ userId }) =>
+        withExercises(await db.select().from(workouts).where(eq(workouts.userId, userId)).orderBy(workouts.position)),
       )
       .post(
         "/",
-        ({ userId, body: { exercises: items, ...body } }) => {
-          const workout = db.insert(workouts).values({ ...body, userId }).returning().get();
-          insertExercises(workout.id, items);
-          return withExercises([workout])[0];
+        async ({ userId, body: { exercises: items, ...body } }) => {
+          const [workout] = await db.insert(workouts).values({ ...body, userId }).returning();
+          await insertExercises(workout.id, items);
+          return (await withExercises([workout]))[0];
         },
         { body: t.Object({ ...workoutBody, exercises: t.Array(exerciseBody, { default: [] }) }) },
       )
       .patch(
         "/:id",
-        ({ userId, params, body: { exercises: items, ...body }, status }) => {
-          if (!ownWorkout(userId, params.id)) return status(404, { error: "Workout not found" });
+        async ({ userId, params, body: { exercises: items, ...body }, status }) => {
+          const existing = await ownWorkout(userId, params.id);
+          if (!existing) return status(404, { error: "Workout not found" });
           const workout = Object.keys(body).length
-            ? db.update(workouts).set(body).where(eq(workouts.id, params.id)).returning().get()
-            : ownWorkout(userId, params.id)!;
+            ? (await db.update(workouts).set(body).where(eq(workouts.id, params.id)).returning())[0]
+            : existing;
           if (items) {
-            db.delete(exercises).where(eq(exercises.workoutId, params.id)).run();
-            insertExercises(params.id, items);
+            await db.delete(exercises).where(eq(exercises.workoutId, params.id));
+            await insertExercises(params.id, items);
           }
-          return withExercises([workout])[0];
+          return (await withExercises([workout]))[0];
         },
         {
           params: t.Object({ id: t.Integer() }),
@@ -77,42 +92,46 @@ export const workoutRoutes = new Elysia()
       )
       .delete(
         "/:id",
-        ({ userId, params, status }) => {
-          if (!ownWorkout(userId, params.id)) return status(404, { error: "Workout not found" });
-          db.delete(sessions).where(eq(sessions.workoutId, params.id)).run();
-          db.delete(exercises).where(eq(exercises.workoutId, params.id)).run();
-          db.delete(workouts).where(eq(workouts.id, params.id)).run();
+        async ({ userId, params, status }) => {
+          if (!(await ownWorkout(userId, params.id))) return status(404, { error: "Workout not found" });
+          await db.delete(sessions).where(eq(sessions.workoutId, params.id));
+          await db.delete(exercises).where(eq(exercises.workoutId, params.id));
+          await db.delete(workouts).where(eq(workouts.id, params.id));
           return { ok: true };
         },
         { params: t.Object({ id: t.Integer() }) },
       )
       .post(
         "/:id/sessions",
-        ({ userId, params, body, status }) => {
-          if (!ownWorkout(userId, params.id)) return status(404, { error: "Workout not found" });
-          return db
+        async ({ userId, params, body, status }) => {
+          if (!validSessionTime(body)) return status(400, invalidRequest);
+          if (!(await ownWorkout(userId, params.id))) return status(404, { error: "Workout not found" });
+          const [session] = await db
             .insert(sessions)
             .values({ ...body, workoutId: params.id, userId })
-            .returning()
-            .get();
+            .returning();
+          return session;
         },
         {
           params: t.Object({ id: t.Integer() }),
           body: t.Object({
-            startedAt: t.String(),
-            finishedAt: t.Optional(t.Nullable(t.String())),
-            notes: t.Optional(t.Nullable(t.String())),
+            startedAt: isoUtc,
+            finishedAt: t.Optional(t.Nullable(isoUtc)),
+            notes: optionalNullableText(2000),
           }),
         },
       ),
   )
   .get(
     "/sessions",
-    ({ userId, query }) => {
+    async ({ userId, query, status }) => {
+      if (query.from && !isValidIsoUtc(query.from)) return status(400, invalidRequest);
+      if (query.to && !isValidIsoUtc(query.to)) return status(400, invalidRequest);
+      if (query.from && query.to && query.from >= query.to) return status(400, invalidRequest);
       const filters = [eq(sessions.userId, userId)];
       if (query.from) filters.push(gte(sessions.startedAt, query.from));
       if (query.to) filters.push(lt(sessions.startedAt, query.to));
-      return db.select().from(sessions).where(and(...filters)).orderBy(sessions.startedAt).all();
+      return db.select().from(sessions).where(and(...filters)).orderBy(sessions.startedAt);
     },
-    { query: t.Object({ from: t.Optional(t.String()), to: t.Optional(t.String()) }) },
+    { query: t.Object({ from: t.Optional(isoUtc), to: t.Optional(isoUtc) }) },
   );

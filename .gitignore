@@ -1,4 +1,36 @@
+# Dependencies
 node_modules/
+
+# Environment (keep .env.example tracked)
+.env
+.env.local
+.env.*.local
+
+# Build / output
+dist/
+out/
+
+# Bun
+*.lockb
+
+# Database artifacts (SQLite leftovers)
 *.db
 *.db-journal
-.env
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker persistent data
+docker-data/

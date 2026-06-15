@@ -1,11 +1,29 @@
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { PGlite } from "@electric-sql/pglite";
+import { Pool } from "pg";
+import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
+import { migrate as migrateNodePg } from "drizzle-orm/node-postgres/migrator";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import { config } from "../config";
 import * as schema from "./schema";
 
-const sqlite = new Database(process.env.DB_PATH ?? "cadence.db");
-sqlite.exec("PRAGMA foreign_keys = ON;");
+const migrationsFolder = `${import.meta.dir}/../../drizzle`;
 
-export const db = drizzle(sqlite, { schema });
+const createDb = async () => {
+  if (config.usePglite) {
+    const client = new PGlite();
+    const db = drizzlePglite(client, { schema });
+    await migratePglite(db, { migrationsFolder });
+    return db;
+  }
 
-migrate(db, { migrationsFolder: `${import.meta.dir}/../../drizzle` });
+  const pool = new Pool({
+    connectionString: config.databaseUrl,
+    max: config.isProduction ? 5 : 2,
+  });
+  const db = drizzleNodePg(pool, { schema });
+  await migrateNodePg(db, { migrationsFolder });
+  return db;
+};
+
+export const db = await createDb();

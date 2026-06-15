@@ -1,6 +1,6 @@
 # cadence_api
 
-Backend REST do Cadence — Bun + ElysiaJS + Drizzle (SQLite). Contexto compartilhado do
+Backend REST do Cadence — Bun + ElysiaJS + Drizzle (Postgres). Contexto compartilhado do
 projeto em `../` (comece por `../CLAUDE.md`).
 
 ## Arquivos de IA deste repo
@@ -23,7 +23,7 @@ projeto em `../` (comece por `../CLAUDE.md`).
 ## Comandos
 
 ```bash
-bun dev           # :3333, migra no boot (cria cadence.db)
+bun dev           # :3333, migra no boot usando DATABASE_URL
 bun test          # endpoints com DB :memory:
 bun run db:generate  # após mudar src/db/schema.ts
 ```
@@ -32,8 +32,8 @@ bun run db:generate  # após mudar src/db/schema.ts
 
 ```
 src/index.ts        # composição do app (export `app` p/ testes; listen só em import.meta.main)
-src/db/             # schema.ts (fonte da verdade) + client com migrate no boot
-src/plugins/auth.ts # guard JWT — deriva `userId`; toda rota autenticada usa ele
+src/db/             # schema.ts (fonte da verdade) + client Postgres com migrate no boot
+src/plugins/auth.ts # guard Better Auth — deriva `userId`; toda rota autenticada usa ele
 src/routes/         # auth, habits, events, workouts, stats — 1 arquivo por recurso
 tests/api.test.ts   # roda via app.handle(), sem servidor
 ```

@@ -1,8 +1,10 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  dialect: "sqlite",
+  dialect: "postgresql",
   schema: "./src/db/schema.ts",
   out: "./drizzle",
-  dbCredentials: { url: "cadence.db" },
+  dbCredentials: {
+    url: process.env.DATABASE_URL ?? "postgres://cadence:cadence@localhost:5432/cadence_db",
+  },
 });

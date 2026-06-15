@@ -4,6 +4,7 @@ import { db } from "../db";
 import { habits, checks, sessions } from "../db/schema";
 import { authPlugin } from "../plugins/auth";
 import { streak } from "./habits";
+import { dateOnly, invalidRequest, isValidDateOnly } from "../validation";
 
 const dateStr = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -11,8 +12,9 @@ export const statsRoutes = new Elysia()
   .use(authPlugin)
   .get(
     "/stats",
-    ({ userId, query }) => {
+    async ({ userId, query, status }) => {
       const date = query.date ?? dateStr(new Date());
+      if (!isValidDateOnly(date)) return status(400, invalidRequest);
       const today = new Date(`${date}T00:00:00Z`);
       const weekDates = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(today);
@@ -20,13 +22,12 @@ export const statsRoutes = new Elysia()
         return d;
       });
 
-      const list = db
+      const list = await db
         .select()
         .from(habits)
-        .where(and(eq(habits.userId, userId), eq(habits.archived, false)))
-        .all();
+        .where(and(eq(habits.userId, userId), eq(habits.archived, false)));
       const allChecks = list.length
-        ? db.select().from(checks).where(inArray(checks.habitId, list.map((h) => h.id))).all()
+        ? await db.select().from(checks).where(inArray(checks.habitId, list.map((h) => h.id)))
         : [];
 
       let todayDone = 0,
@@ -52,19 +53,18 @@ export const statsRoutes = new Elysia()
       }
 
       const weekStart = dateStr(weekDates[6]);
-      const sessionsThisWeek = db
+      const sessionsThisWeek = await db
         .select()
         .from(sessions)
-        .where(and(eq(sessions.userId, userId), gte(sessions.startedAt, weekStart)))
-        .all().length;
+        .where(and(eq(sessions.userId, userId), gte(sessions.startedAt, weekStart)));
 
       return {
         todayDone,
         todayTotal,
         weekPercent: weekTotal === 0 ? 0 : Math.round((weekDone / weekTotal) * 100),
         bestStreak,
-        sessionsThisWeek,
+        sessionsThisWeek: sessionsThisWeek.length,
       };
     },
-    { query: t.Object({ date: t.Optional(t.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" })) }) },
+    { query: t.Object({ date: t.Optional(dateOnly) }) },
   );

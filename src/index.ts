@@ -5,9 +5,21 @@ import { habitRoutes } from "./routes/habits";
 import { eventRoutes } from "./routes/events";
 import { workoutRoutes } from "./routes/workouts";
 import { statsRoutes } from "./routes/stats";
+import { loggingPlugin } from "./plugins/logging";
+import { securityPlugin, isAllowedOrigin } from "./plugins/security";
+import { config } from "./config";
 
 export const app = new Elysia()
-  .use(cors())
+  .use(securityPlugin)
+  .use(loggingPlugin)
+  .use(
+    cors({
+      origin: (request) => isAllowedOrigin(request.headers.get("origin")),
+      credentials: true,
+      allowedHeaders: ["Content-Type", "Authorization"],
+      exposeHeaders: ["set-auth-token"],
+    }),
+  )
   .get("/health", () => ({ ok: true }))
   .use(authRoutes)
   .use(habitRoutes)
@@ -16,6 +28,8 @@ export const app = new Elysia()
   .use(statsRoutes);
 
 if (import.meta.main) {
-  app.listen(Number(process.env.PORT ?? 3333));
-  console.log(`🥁 cadence_api on http://localhost:${app.server?.port}`);
+  app.listen(config.port);
+  if (!config.isProduction) {
+    console.log(`cadence_api on http://localhost:${app.server?.port}`);
+  }
 }

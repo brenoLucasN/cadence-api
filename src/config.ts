@@ -30,9 +30,7 @@ export const config = {
   authRateLimitMax: parseIntEnv("AUTH_RATE_LIMIT_MAX", isProduction ? 10 : 100),
 };
 
-if (config.isProduction && config.corsOrigins.length === 0) {
-  throw new Error("CORS_ORIGINS is required in production");
-}
+
 
 if (!config.usePglite && !config.databaseUrl) {
   throw new Error("DATABASE_URL is required unless USE_PGLITE=1");

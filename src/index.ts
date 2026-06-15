@@ -33,3 +33,5 @@ if (import.meta.main) {
     console.log(`cadence_api on http://localhost:${app.server?.port}`);
   }
 }
+
+export default app;

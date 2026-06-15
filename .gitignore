@@ -34,3 +34,5 @@ Thumbs.db
 
 # Docker persistent data
 docker-data/
+.vercel
+/api/index.js

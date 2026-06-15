@@ -22,7 +22,9 @@ const createDb = async () => {
     max: config.isProduction ? 5 : 2,
   });
   const db = drizzleNodePg(pool, { schema });
-  await migrateNodePg(db, { migrationsFolder });
+  if (!config.isProduction) {
+    await migrateNodePg(db, { migrationsFolder });
+  }
   return db;
 };
 

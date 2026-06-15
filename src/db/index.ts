@@ -9,23 +9,37 @@ import * as schema from "./schema";
 
 const migrationsFolder = `${import.meta.dir}/../../drizzle`;
 
-const createDb = async () => {
+export let migrationPromise: Promise<void> | null = null;
+
+const createDbSync = () => {
   if (config.usePglite) {
     const client = new PGlite();
-    const db = drizzlePglite(client, { schema });
-    await migratePglite(db, { migrationsFolder });
-    return db;
+    const dbInstance = drizzlePglite(client, { schema });
+    
+    // Run migration in background to avoid top-level await blocking module initialization
+    migrationPromise = migratePglite(dbInstance, { migrationsFolder }).catch((err) => {
+      console.error("PGlite migration failed:", err);
+      throw err;
+    });
+    
+    return dbInstance;
   }
 
   const pool = new Pool({
     connectionString: config.databaseUrl,
     max: config.isProduction ? 5 : 2,
   });
-  const db = drizzleNodePg(pool, { schema });
+  const dbInstance = drizzleNodePg(pool, { schema });
+  
   if (!config.isProduction) {
-    await migrateNodePg(db, { migrationsFolder });
+    // Run migration in background to avoid top-level await blocking module initialization
+    migrationPromise = migrateNodePg(dbInstance, { migrationsFolder }).catch((err) => {
+      console.error("Local migration failed:", err);
+      throw err;
+    });
   }
-  return db;
+  
+  return dbInstance;
 };
 
-export const db = await createDb();
+export const db = createDbSync();

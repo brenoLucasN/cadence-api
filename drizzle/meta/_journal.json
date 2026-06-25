@@ -8,6 +8,20 @@
       "when": 1781482103083,
       "tag": "0000_massive_abomination",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782028698820,
+      "tag": "0001_bright_dazzler",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782096750000,
+      "tag": "0002_workout_schedule",
+      "breakpoints": true
     }
   ]
 }

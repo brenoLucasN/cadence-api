@@ -1,8 +1,8 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { config } from "../config";
-import * as schema from "./schema";
+import { config } from "../config.js";
+import * as schema from "./schema.js";
 
 const runMigration = async () => {
   if (!config.databaseUrl) {

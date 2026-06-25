@@ -1,13 +1,13 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { authRoutes } from "./routes/auth";
-import { habitRoutes } from "./routes/habits";
-import { eventRoutes } from "./routes/events";
-import { workoutRoutes } from "./routes/workouts";
-import { statsRoutes } from "./routes/stats";
-import { loggingPlugin } from "./plugins/logging";
-import { securityPlugin, isAllowedOrigin } from "./plugins/security";
-import { config } from "./config";
+import { authRoutes } from "./routes/auth.js";
+import { habitRoutes } from "./routes/habits.js";
+import { eventRoutes } from "./routes/events.js";
+import { workoutRoutes } from "./routes/workouts.js";
+import { statsRoutes } from "./routes/stats.js";
+import { loggingPlugin } from "./plugins/logging.js";
+import { securityPlugin, isAllowedOrigin } from "./plugins/security.js";
+import { config } from "./config.js";
 
 export const app = new Elysia()
   .use(securityPlugin)

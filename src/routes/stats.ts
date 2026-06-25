@@ -1,10 +1,10 @@
 import { Elysia, t } from "elysia";
 import { and, eq, gte, inArray } from "drizzle-orm";
-import { db } from "../db";
-import { habits, checks, sessions } from "../db/schema";
-import { authPlugin } from "../plugins/auth";
-import { streak } from "./habits";
-import { dateOnly, invalidRequest, isValidDateOnly } from "../validation";
+import { db } from "../db/index.js";
+import { habits, checks, sessions } from "../db/schema.js";
+import { authPlugin } from "../plugins/auth.js";
+import { streak } from "./habits.js";
+import { dateOnly, invalidRequest, isValidDateOnly } from "../validation.js";
 
 const dateStr = (d: Date) => d.toISOString().slice(0, 10);
 

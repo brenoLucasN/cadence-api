@@ -1,8 +1,8 @@
 import { Elysia, t } from "elysia";
 import { and, eq, gte, inArray, lt } from "drizzle-orm";
-import { db } from "../db";
-import { workouts, exercises, sessions } from "../db/schema";
-import { authPlugin } from "../plugins/auth";
+import { db } from "../db/index.js";
+import { workouts, exercises, sessions } from "../db/schema.js";
+import { authPlugin } from "../plugins/auth.js";
 import {
   boundedText,
   hexColor,
@@ -10,7 +10,16 @@ import {
   isoUtc,
   isValidIsoUtc,
   optionalNullableText,
-} from "../validation";
+} from "../validation.js";
+
+const setType = t.Union([t.Literal("normal"), t.Literal("warmup"), t.Literal("progression"), t.Literal("failure")]);
+
+const exerciseSetBody = t.Object({
+  type: t.Optional(setType),
+  reps: t.Integer({ minimum: 1, maximum: 999 }),
+  weight: t.Optional(t.Nullable(t.Integer({ minimum: 0, maximum: 9999 }))),
+  restSec: t.Integer({ minimum: 0, maximum: 3600 }),
+});
 
 const exerciseBody = t.Object({
   name: boundedText(80),
@@ -18,12 +27,25 @@ const exerciseBody = t.Object({
   reps: t.Optional(t.Integer({ minimum: 1, maximum: 999 })),
   weight: t.Optional(t.Nullable(t.Integer({ minimum: 0, maximum: 9999 }))),
   restSec: t.Optional(t.Integer({ minimum: 0, maximum: 3600 })),
+  series: t.Optional(t.Array(exerciseSetBody, { maxItems: 99 })),
+});
+
+const sessionSetBody = t.Object({
+  exerciseName: boundedText(80),
+  setIndex: t.Integer({ minimum: 0, maximum: 98 }),
+  type: t.Optional(setType),
+  reps: t.Integer({ minimum: 0, maximum: 999 }),
+  weight: t.Integer({ minimum: 0, maximum: 9999 }),
+  restSec: t.Integer({ minimum: 0, maximum: 3600 }),
+  completed: t.Boolean({ default: false }),
 });
 
 const workoutBody = {
   name: boundedText(80),
   color: t.Optional(hexColor),
   notes: optionalNullableText(2000),
+  days: t.Optional(t.RegExp(/^[01]{7}$/)),
+  scheduledTime: t.Optional(t.Nullable(t.RegExp(/^([01]\d|2[0-3]):[0-5]\d$/))),
 };
 
 const ownWorkout = async (userId: number, id: number) => {
@@ -41,11 +63,74 @@ const withExercises = async (list: (typeof workouts.$inferSelect)[]) => {
   return list.map((w) => ({ ...w, exercises: all.filter((e) => e.workoutId === w.id) }));
 };
 
+type ExerciseSeriesInput = {
+  name: string;
+  sets?: number;
+  reps?: number;
+  weight?: number | null;
+  restSec?: number;
+  series?: { type?: string; reps: number; weight?: number | null; restSec: number }[] | null;
+};
+
+const normalizeSeries = (exercise: ExerciseSeriesInput) => {
+  if (exercise.series && exercise.series.length > 0) {
+    return exercise.series.map((set) => ({
+      type: set.type ?? "normal",
+      reps: set.reps,
+      weight: set.weight ?? null,
+      restSec: set.restSec,
+    }));
+  }
+  return Array.from({ length: exercise.sets ?? 3 }, () => ({
+    type: "normal",
+    reps: exercise.reps ?? 10,
+    weight: exercise.weight ?? null,
+    restSec: exercise.restSec ?? 60,
+  }));
+};
+
+const sessionMetrics = (sets: (typeof sessionSetBody.static)[] = []) => {
+  const completed = sets.filter((set) => set.completed);
+  return {
+    activeSec: completed.reduce((sum, set) => sum + set.reps, 0),
+    restSec: completed.reduce((sum, set) => sum + set.restSec, 0),
+    volume: completed.reduce((sum, set) => sum + set.weight * set.reps, 0),
+    completedSets: completed.length,
+  };
+};
+
+const workoutEstimate = (workout: typeof workouts.$inferSelect, items: (typeof exercises.$inferSelect)[]) => {
+  const allSets = items.flatMap((exercise) => normalizeSeries({
+    name: exercise.name,
+    sets: exercise.sets,
+    reps: exercise.reps,
+    weight: exercise.weight,
+    restSec: exercise.restSec,
+    series: exercise.series ?? undefined,
+  }));
+  const activeSec = allSets.reduce((sum, set) => sum + set.reps, 0);
+  const restSec = allSets.reduce((sum, set) => sum + set.restSec, 0);
+  const volume = allSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
+  return { workoutId: workout.id, activeSec, restSec, totalSec: activeSec + restSec, volume, sets: allSets.length };
+};
+
 const insertExercises = async (workoutId: number, items: (typeof exerciseBody.static)[]) => {
   if (items.length === 0) return;
   await db
     .insert(exercises)
-    .values(items.map((e, position) => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, restSec: e.restSec, workoutId, position })))
+    .values(items.map((e, position) => {
+      const series = normalizeSeries(e);
+      return {
+        name: e.name,
+        sets: series.length,
+        reps: series[0]?.reps ?? e.reps,
+        weight: series[0]?.weight ?? e.weight,
+        restSec: series[0]?.restSec ?? e.restSec,
+        series,
+        workoutId,
+        position,
+      };
+    }))
 };
 
 const validSessionTime = (body: { startedAt: string; finishedAt?: string | null }) => {
@@ -65,7 +150,7 @@ export const workoutRoutes = new Elysia()
       .post(
         "/",
         async ({ userId, body: { exercises: items, ...body } }) => {
-          const [workout] = await db.insert(workouts).values({ userId, name: body.name, color: body.color, notes: body.notes }).returning();
+          const [workout] = await db.insert(workouts).values({ userId, name: body.name, color: body.color, notes: body.notes, days: body.days, scheduledTime: body.scheduledTime }).returning();
           await insertExercises(workout.id, items);
           return (await withExercises([workout]))[0];
         },
@@ -103,15 +188,36 @@ export const workoutRoutes = new Elysia()
         },
         { params: t.Object({ id: t.Integer() }) },
       )
+      .get(
+        "/:id/metrics",
+        async ({ userId, params, status }) => {
+          const id = Number(params.id);
+          const workout = await ownWorkout(userId, id);
+          if (!workout) return status(404, { error: "Workout not found" });
+          const items = await db.select().from(exercises).where(eq(exercises.workoutId, id)).orderBy(exercises.position);
+          return workoutEstimate(workout, items);
+        },
+        { params: t.Object({ id: t.Integer() }) },
+      )
       .post(
         "/:id/sessions",
         async ({ userId, params, body, status }) => {
           const id = Number(params.id);
           if (!validSessionTime(body)) return status(400, invalidRequest);
           if (!(await ownWorkout(userId, id))) return status(404, { error: "Workout not found" });
+          const sessionSets = body.sets?.map((set) => ({ ...set, type: set.type ?? "normal" }));
+          const metrics = sessionMetrics(sessionSets);
           const [session] = await db
             .insert(sessions)
-            .values({ startedAt: body.startedAt, finishedAt: body.finishedAt, notes: body.notes, workoutId: id, userId })
+            .values({
+              startedAt: body.startedAt,
+              finishedAt: body.finishedAt,
+              notes: body.notes,
+              sets: sessionSets,
+              ...metrics,
+              workoutId: id,
+              userId,
+            })
             .returning();
           return session;
         },
@@ -121,6 +227,7 @@ export const workoutRoutes = new Elysia()
             startedAt: isoUtc,
             finishedAt: t.Optional(t.Nullable(isoUtc)),
             notes: optionalNullableText(2000),
+            sets: t.Optional(t.Array(sessionSetBody, { maxItems: 500 })),
           }),
         },
       ),

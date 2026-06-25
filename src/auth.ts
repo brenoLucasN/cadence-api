@@ -1,9 +1,9 @@
 import { betterAuth } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { db } from "./db";
-import * as schema from "./db/schema";
-import { config } from "./config";
+import { db } from "./db/index.js";
+import * as schema from "./db/schema.js";
+import { config } from "./config.js";
 
 const requiredInProduction = (name: string, fallback: string) => {
   const value = process.env[name];

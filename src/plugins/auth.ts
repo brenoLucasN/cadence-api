@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { auth } from "../auth";
+import { auth } from "../auth.js";
 
 const requestHeaders = (headers: Record<string, string | undefined>) => {
   const out = new Headers();

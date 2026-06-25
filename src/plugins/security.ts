@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { config } from "../config";
+import { config } from "../config.js";
 
 const mutatingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const devOrigin = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/;

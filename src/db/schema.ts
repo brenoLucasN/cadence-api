@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 const id = () => serial("id").primaryKey();
 const createdAt = () =>
@@ -105,6 +105,8 @@ export const workouts = pgTable("workouts", {
   name: text("name").notNull(),
   color: text("color").notNull().default("#FB7185"),
   notes: text("notes"),
+  days: text("days").notNull().default("0000000"),
+  scheduledTime: text("scheduled_time"),
   position: integer("position").notNull().default(0),
   createdAt: createdAt(),
 });
@@ -117,6 +119,7 @@ export const exercises = pgTable("exercises", {
   reps: integer("reps").notNull().default(10),
   weight: integer("weight"), // kg; null = bodyweight
   restSec: integer("rest_sec").notNull().default(60),
+  series: jsonb("series").$type<{ type: string; reps: number; weight?: number | null; restSec: number }[]>(),
   position: integer("position").notNull().default(0),
 });
 
@@ -127,4 +130,9 @@ export const sessions = pgTable("sessions", {
   startedAt: text("started_at").notNull(),
   finishedAt: text("finished_at"),
   notes: text("notes"),
+  activeSec: integer("active_sec").notNull().default(0),
+  restSec: integer("rest_sec").notNull().default(0),
+  volume: integer("volume").notNull().default(0),
+  completedSets: integer("completed_sets").notNull().default(0),
+  sets: jsonb("sets").$type<{ exerciseName: string; setIndex: number; type: string; reps: number; weight: number; restSec: number; completed: boolean }[]>(),
 });

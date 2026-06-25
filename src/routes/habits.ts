@@ -1,9 +1,9 @@
 import { Elysia, t } from "elysia";
 import { and, eq, inArray } from "drizzle-orm";
-import { db } from "../db";
-import { habits, checks } from "../db/schema";
-import { authPlugin } from "../plugins/auth";
-import { boundedText, dateOnly, hexColor, invalidRequest, isValidDateOnly, localTime } from "../validation";
+import { db } from "../db/index.js";
+import { habits, checks } from "../db/schema.js";
+import { authPlugin } from "../plugins/auth.js";
+import { boundedText, dateOnly, hexColor, invalidRequest, isValidDateOnly, localTime } from "../validation.js";
 
 const habitBody = {
   name: boundedText(80),

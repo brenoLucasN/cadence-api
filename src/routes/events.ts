@@ -1,8 +1,8 @@
 import { Elysia, t } from "elysia";
 import { and, eq, gte, lt } from "drizzle-orm";
-import { db } from "../db";
-import { events } from "../db/schema";
-import { authPlugin } from "../plugins/auth";
+import { db } from "../db/index.js";
+import { events } from "../db/schema.js";
+import { authPlugin } from "../plugins/auth.js";
 import {
   boundedText,
   hexColor,
@@ -10,7 +10,7 @@ import {
   isoUtc,
   isValidIsoUtc,
   optionalNullableText,
-} from "../validation";
+} from "../validation.js";
 
 const eventBody = {
   title: boundedText(120),

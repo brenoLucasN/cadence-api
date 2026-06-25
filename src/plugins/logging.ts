@@ -1,5 +1,5 @@
 import { Elysia, ElysiaCustomStatusResponse } from "elysia";
-import { config } from "../config";
+import { config } from "../config.js";
 
 const starts = new WeakMap<Request, number>();
 

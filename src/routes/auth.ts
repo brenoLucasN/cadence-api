@@ -1,11 +1,11 @@
 import { Elysia, t } from "elysia";
 import { isAPIError } from "better-auth/api";
 import { eq } from "drizzle-orm";
-import { auth } from "../auth";
-import { db } from "../db";
-import { users } from "../db/schema";
-import { authPlugin } from "../plugins/auth";
-import { boundedText } from "../validation";
+import { auth } from "../auth.js";
+import { db } from "../db/index.js";
+import { users } from "../db/schema.js";
+import { authPlugin } from "../plugins/auth.js";
+import { boundedText } from "../validation.js";
 
 const credentials = {
   email: t.String({ format: "email" }),

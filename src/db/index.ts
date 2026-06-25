@@ -4,8 +4,8 @@ import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { migrate as migrateNodePg } from "drizzle-orm/node-postgres/migrator";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
-import { config } from "../config";
-import * as schema from "./schema";
+import { config } from "../config.js";
+import * as schema from "./schema.js";
 
 const migrationsFolder = `${import.meta.dir}/../../drizzle`;
 

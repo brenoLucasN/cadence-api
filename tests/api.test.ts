@@ -168,19 +168,26 @@ describe("workouts", () => {
       await json(
         "POST",
         "/workouts",
-        { name: "Push A", exercises: [{ name: "Bench", sets: 4, reps: 8, weight: 60 }] },
+        { name: "Push A", days: "1010100", scheduledTime: "09:30", exercises: [{ name: "Bench", series: [{ type: "warmup", reps: 8, weight: 60, restSec: 90 }] }] },
         token,
       )
     ).json();
+    expect(created.days).toBe("1010100");
+    expect(created.scheduledTime).toBe("09:30");
     expect(created.exercises).toHaveLength(1);
+    expect(created.exercises[0].series).toEqual([{ type: "warmup", reps: 8, weight: 60, restSec: 90 }]);
+
+    const estimate = await (await json("GET", `/workouts/${created.id}/metrics`, undefined, token)).json();
+    expect(estimate).toMatchObject({ activeSec: 8, restSec: 90, totalSec: 98, volume: 480, sets: 1 });
 
     const session = await json(
       "POST",
       `/workouts/${created.id}/sessions`,
-      { startedAt: "2026-06-12T10:00:00Z", finishedAt: "2026-06-12T11:00:00Z" },
+      { startedAt: "2026-06-12T10:00:00Z", finishedAt: "2026-06-12T11:00:00Z", sets: [{ exerciseName: "Bench", setIndex: 0, type: "warmup", reps: 8, weight: 60, restSec: 90, completed: true }] },
       token,
     );
     expect(session.status).toBe(200);
+    expect(await session.json()).toMatchObject({ activeSec: 8, restSec: 90, volume: 480, completedSets: 1 });
 
     const stats = await (await json("GET", "/stats?date=2026-06-12", undefined, token)).json();
     expect(stats.sessionsThisWeek).toBe(1);
